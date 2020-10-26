@@ -34,7 +34,7 @@ enum { Global, Local };
 
 int *text, *stack; // text segment, stack
 int * old_text; // for dump text segment
-char *data; // data segment
+char *data; // data segment for storing string literals
 int *idmain;
 
 char *src, *old_src;  // pointer to source code string
@@ -310,8 +310,8 @@ void match(int tk) {
 void expression(int level) {
 	// expressions have various format but majorly can be divided into two parts: unit and operator
 	// for example `(char) *a[10] = (int *) func(b > 0 ? 10 : 20);
-	// `a[10]` is an unit while `*` is an operator.
-	// `func(...)` in total is an unit.
+	// `a[10]` is an unit while `*` is an operator
+	// `func(...)` in total is an unit
 	// so we should first parse those unit and unary operators and then the binary ones, also the expression can be in the following types:
 	// 1. unit_unary ::= unit | unit unary_op | unary_op unit
 	// 2. expr ::= unit_unary (bin_op unit_unary ...)
@@ -328,7 +328,6 @@ void expression(int level) {
 		}
 		if (token == Num) {
 			match(Num);
-
 			// emit code
 			*++text = IMM;
 			*++text = token_val;
@@ -339,7 +338,6 @@ void expression(int level) {
 			// emit code
 			*++text = IMM;
 			*++text = token_val;
-
 			match('"');
 
 			// store the rest strings
@@ -367,26 +365,22 @@ void expression(int level) {
 				match(Mul);
 				expr_type = expr_type + PTR;
 			}
-
 			match(')');
 
 			// emit code
 			*++text = IMM;
 			*++text = (expr_type == CHAR) ? sizeof(char) : sizeof(int);
-
 			expr_type = INT;
 		}
 		else if (token == Id) {
 			// there are several type when occurs to Id but this is unit, so it can only be
 			// 1. function call; 2. Enum variable; 3. global/local variable
 			match(Id);
-
 			id = current_id;
 
 			if (token == '(') {
 				// function call
 				match('(');
-
 				// pass in arguments
 				tmp = 0; // number of arguments
 				while (token != ')') {
@@ -397,7 +391,6 @@ void expression(int level) {
 					if (token == ',')
 						match(',');
 				}
-
 				match(')');
 
 				// emit code
@@ -414,7 +407,6 @@ void expression(int level) {
 					printf("%d: bad function call\n", line);
 					exit(-1);
 				}
-
 				// clean the stack for arguments
 				if (tmp > 0) {
 					*++text = ADJ;
@@ -458,11 +450,8 @@ void expression(int level) {
 					match(Mul);
 					tmp = tmp + PTR;
 				}
-
 				match(')');
-
 				expression(Inc); // cast has precedence as Inc(++)
-
 				expr_type = tmp;
 			}
 			else {
@@ -508,7 +497,6 @@ void expression(int level) {
 			*++text = IMM;
 			*++text = 0;
 			*++text = EQ;
-
 			expr_type = INT;
 		}
 		else if (token == '~') {
@@ -521,14 +509,12 @@ void expression(int level) {
 			*++text = IMM;
 			*++text = -1;
 			*++text = XOR;
-
 			expr_type = INT;
 		}
 		else if (token == Add) {
 			// +var, do nothing
 			match(Add);
 			expression(Inc);
-
 			expr_type = INT;
 		}
 		else if (token == Sub) {
@@ -876,12 +862,10 @@ void statement() {
 		match('(');
 		expression(Assign);  // parse condition
 		match(')');
-
 		// emit code for if
 		*++text = JZ;
 		b = ++text;
-
-		statement();         // parse statement
+		statement();// parse statement
 
 		if (token == Else) { // parse else
 			match(Else);
@@ -904,7 +888,6 @@ void statement() {
 		// b:                     b:
 		match(While);
 		a = text + 1;
-
 		match('(');
 		expression(Assign);
 		match(')');
@@ -921,21 +904,16 @@ void statement() {
 	else if (token == '{') {
 		// { <statement> ... }
 		match('{');
-
 		while (token != '}')
 			statement();
-
 		match('}');
 	}
 	else if (token == Return) {
 		// return [expression];
 		match(Return);
-
 		if (token != ';')
 			expression(Assign);
-
 		match(';');
-
 		// emit code for return
 		*++text = LEV;
 	}
@@ -950,7 +928,7 @@ void statement() {
 }
 
 void enum_declaration() {
-	// parse enum [id] { a = 1, b = 3, ...}
+	// enum [id]{ a = 1, b = 3, ...}
 	int i = 0;
 
 	while (token != '}') {
@@ -1022,12 +1000,8 @@ void function_parameter() {
 }
 
 void function_body() {
-	// type func_name (...) {...}
-	//                   -->|   |<--
-	// ... {
 	// 1. local declarations
 	// 2. statements
-	// }
 
 	int pos_local; // position of local variables on the stack
 	int type;
@@ -1060,7 +1034,7 @@ void function_body() {
 			// store the local variable
 			current_id[BClass] = current_id[Class]; current_id[Class] = Loc;
 			current_id[BType] = current_id[Type];  current_id[Type] = type;
-			current_id[BValue] = current_id[Value]; current_id[Value] = ++pos_local;   // index of current parameter
+			current_id[BValue] = current_id[Value]; current_id[Value] = ++pos_local; // index of current parameter
 
 			if (token == ',')
 				match(',');
@@ -1071,11 +1045,9 @@ void function_body() {
 	// save the stack size for local variables
 	*++text = ENT;
 	*++text = pos_local - index_of_bp;
-
 	// statements
 	while (token != '}')
 		statement();
-
 	// emit code for leaving the sub function
 	*++text = LEV;
 }
@@ -1110,9 +1082,9 @@ void global_declaration() {
 	int i; // tmp
 	basetype = INT;
 
-	// parse enum, this should be treated alone.
+	// parse enum, this should be treated alone
 	if (token == Enum) {
-		// enum [id] { a = 10, b = 20, ... }
+		// enum [id]{ a = 10, b = 20, ... }
 		match(Enum);
 
 		if (token != '{')
@@ -1124,7 +1096,6 @@ void global_declaration() {
 			enum_declaration();
 			match('}');
 		}
-
 		match(';');
 
 		return;
@@ -1138,7 +1109,7 @@ void global_declaration() {
 		basetype = CHAR;
 	}
 
-	// parse the comma seperated variable declaration.
+	// parse the comma seperated variable declaration
 	while (token != ';' && token != '}') {
 		type = basetype;
 		// parse pointer type, note that there may exist `int ****x;`
@@ -1219,7 +1190,6 @@ int eval() {
 			*--sp = (int)(pc + 1); 
 			pc = (int *)*pc;
 		}           
-		//else if (op == RET)  {pc = (int *)*sp++;}                        // return from subroutine
 		else if (op == ENT) { 
 			// make new stack frame
 			*--sp = (int)bp; 
@@ -1228,7 +1198,7 @@ int eval() {
 		}      
 		else if (op == ADJ) { sp = sp + *pc++; }                           // add esp, <size>
 		else if (op == LEV) { 
-			// restore call frame and PC
+			// restore call frame and PC, return from subroutine
 			sp = bp; 
 			bp = (int *)*sp++; 
 			pc = (int *)*sp++; 
